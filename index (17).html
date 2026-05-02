@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern To-Do List</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-top">
+                <h1>My Tasks</h1>
+                <button id="theme-toggle" class="icon-btn" title="Toggle Light/Dark Mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+            
+            <div class="task-input-container">
+                <form id="todo-form">
+                    <div class="input-group">
+                        <input type="text" id="task-input" placeholder="What needs to be done?" required>
+                        <select id="priority-input">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                        <input type="date" id="date-input">
+                        <button type="submit" class="add-btn">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="controls-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" placeholder="Search tasks...">
+                </div>
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="pending">Pending</button>
+                    <button class="filter-btn" data-filter="completed">Completed</button>
+                </div>
+                <button id="export-btn" class="secondary-btn" title="Export as CSV">
+                    <i class="fas fa-file-export"></i> Export
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <div class="list-section">
+                <h2 id="pending-title">Pending Tasks (<span id="pending-count">0</span>)</h2>
+                <ul id="pending-list" class="todo-list">
+                    <!-- Tasks will be injected here -->
+                </ul>
+            </div>
+
+            <div class="list-section">
+                <h2 id="completed-title">Completed Tasks (<span id="completed-count">0</span>)</h2>
+                <ul id="completed-list" class="todo-list">
+                    <!-- Completed tasks will be injected here -->
+                </ul>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
