@@ -3,74 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern To-Do List</title>
+    <title>Smart Productivity Suite</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <div class="header-top">
-                <h1>My Tasks</h1>
-                <button id="theme-toggle" class="icon-btn" title="Toggle Light/Dark Mode">
-                    <i class="fas fa-moon"></i>
-                </button>
+    <div class="app-wrapper">
+        <!-- Sidebar for Navigation & Stats -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-check-double"></i>
+                    <span>SmartTask</span>
+                </div>
             </div>
-            
-            <div class="task-input-container">
-                <form id="todo-form">
-                    <div class="input-group">
-                        <input type="text" id="task-input" placeholder="What needs to be done?" required>
-                        <select id="priority-input">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                        </select>
-                        <input type="date" id="date-input">
-                        <button type="submit" class="add-btn">
-                            <i class="fas fa-plus"></i> Add
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="today">
+                    <i class="fas fa-calendar-day"></i> Today
+                </button>
+                <button class="nav-item" data-view="upcoming">
+                    <i class="fas fa-calendar-alt"></i> Upcoming
+                </button>
+                <button class="nav-item" data-view="goals">
+                    <i class="fas fa-bullseye"></i> Goals
+                </button>
+                <button class="nav-item" data-view="analytics">
+                    <i class="fas fa-chart-line"></i> Analytics
+                </button>
+            </nav>
+
+            <div class="sidebar-section">
+                <h3>Categories</h3>
+                <div id="category-list" class="category-list">
+                    <!-- Categories will be injected here -->
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="productivity-card">
+                    <h4>Daily Progress</h4>
+                    <div class="progress-circle-container">
+                        <svg viewBox="0 0 36 36" class="circular-chart">
+                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path id="progress-circle" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <text x="18" y="20.35" class="percentage" id="progress-text">0%</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="global-search" placeholder="Search tasks, goals, or tags...">
+                </div>
+                <div class="top-actions">
+                    <button id="notification-btn" class="icon-btn" title="Enable Notifications">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button id="theme-toggle" class="icon-btn">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <div class="user-profile">
+                        <img src="https://ui-avatars.com/api/?name=User&background=6c5ce7&color=fff" alt="User">
+                    </div>
+                </div>
+            </header>
+
+            <div id="view-container" class="view-container">
+                <!-- Views will be dynamically swapped here -->
+                
+                <!-- Default: Today View -->
+                <section id="today-view" class="view active">
+                    <div class="view-header">
+                        <div>
+                            <h2 id="current-date-display">Today, May 3rd</h2>
+                            <p class="subtitle">You have <span id="pending-count">0</span> tasks pending</p>
+                        </div>
+                        <button id="add-task-trigger" class="primary-btn">
+                            <i class="fas fa-plus"></i> New Task
                         </button>
                     </div>
-                </form>
-            </div>
 
-            <div class="controls-container">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="search-input" placeholder="Search tasks...">
-                </div>
-                <div class="filter-group">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="pending">Pending</button>
-                    <button class="filter-btn" data-filter="completed">Completed</button>
-                </div>
-                <button id="export-btn" class="secondary-btn" title="Export as CSV">
-                    <i class="fas fa-file-export"></i> Export
-                </button>
-            </div>
-        </header>
+                    <div class="filter-bar">
+                        <div class="filter-chips">
+                            <button class="chip active" data-filter="all">All</button>
+                            <button class="chip" data-filter="work">Work</button>
+                            <button class="chip" data-filter="personal">Personal</button>
+                            <button class="chip" data-filter="study">Study</button>
+                        </div>
+                        <div class="sort-dropdown">
+                            <select id="sort-tasks">
+                                <option value="priority">Sort by Priority</option>
+                                <option value="time">Sort by Time</option>
+                                <option value="alphabetical">Alphabetical</option>
+                            </select>
+                        </div>
+                    </div>
 
-        <main>
-            <div class="list-section">
-                <h2 id="pending-title">Pending Tasks (<span id="pending-count">0</span>)</h2>
-                <ul id="pending-list" class="todo-list">
-                    <!-- Tasks will be injected here -->
-                </ul>
-            </div>
-
-            <div class="list-section">
-                <h2 id="completed-title">Completed Tasks (<span id="completed-count">0</span>)</h2>
-                <ul id="completed-list" class="todo-list">
-                    <!-- Completed tasks will be injected here -->
-                </ul>
+                    <div class="task-sections">
+                        <div class="task-group">
+                            <h3>Pending</h3>
+                            <ul id="pending-list" class="task-list"></ul>
+                        </div>
+                        <div class="task-group">
+                            <h3>Completed</h3>
+                            <ul id="completed-list" class="task-list"></ul>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
 
-    <!-- Toast Notification Container -->
+    <!-- Modal for Adding/Editing Tasks -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Create New Task</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="task-form">
+                <div class="form-group">
+                    <label for="task-title">Task Title</label>
+                    <input type="text" id="task-title" placeholder="e.g., Weekly Team Meeting" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-date">Date</label>
+                        <input type="date" id="task-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-time">Time</label>
+                        <input type="time" id="task-time">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-priority">Priority</label>
+                        <select id="task-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-category">Category</label>
+                        <select id="task-category">
+                            <option value="work">Work</option>
+                            <option value="personal">Personal</option>
+                            <option value="study">Study</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Recurrence</label>
+                    <div class="recurrence-options">
+                        <select id="task-repeat">
+                            <option value="none">None</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="secondary-btn close-modal">Cancel</button>
+                    <button type="submit" class="primary-btn">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
     <div id="toast-container"></div>
 
     <script src="script.js"></script>
