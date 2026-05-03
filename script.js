@@ -1,301 +1,277 @@
 /**
- * Modern To-Do List Application
- * Features: CRUD, Local Storage, Drag & Drop, Search/Filter, Dark Mode, CSV Export
+ * Smart Productivity Suite - Core Logic
+ * Handles State, Reminders, Recurrence, and UI Updates
  */
 
-// State Management
-let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
-let currentFilter = 'all';
-let searchQuery = '';
+class SmartTodoApp {
+    constructor() {
+        this.tasks = JSON.parse(localStorage.getItem('smart_tasks')) || [];
+        this.goals = JSON.parse(localStorage.getItem('smart_goals')) || [];
+        this.currentView = 'today';
+        this.currentFilter = 'all';
+        this.searchQuery = '';
+        
+        this.init();
+    }
 
-// DOM Elements
-const todoForm = document.getElementById('todo-form');
-const taskInput = document.getElementById('task-input');
-const priorityInput = document.getElementById('priority-input');
-const dateInput = document.getElementById('date-input');
-const pendingList = document.getElementById('pending-list');
-const completedList = document.getElementById('completed-list');
-const pendingCount = document.getElementById('pending-count');
-const completedCount = document.getElementById('completed-count');
-const themeToggle = document.getElementById('theme-toggle');
-const searchInput = document.getElementById('search-input');
-const filterBtns = document.querySelectorAll('.filter-btn');
-const exportBtn = document.getElementById('export-btn');
-const toastContainer = document.getElementById('toast-container');
+    init() {
+        this.cacheDOM();
+        this.bindEvents();
+        this.updateDateDisplay();
+        this.render();
+        this.setupReminders();
+        this.checkRecurrence();
+        this.requestNotificationPermission();
+    }
+
+    cacheDOM() {
+        this.dom = {
+            taskListPending: document.getElementById('pending-list'),
+            taskListCompleted: document.getElementById('completed-list'),
+            pendingCount: document.getElementById('pending-count'),
+            progressCircle: document.getElementById('progress-circle'),
+            progressText: document.getElementById('progress-text'),
+            taskModal: document.getElementById('task-modal'),
+            taskForm: document.getElementById('task-form'),
+            addBtn: document.getElementById('add-task-trigger'),
+            closeModals: document.querySelectorAll('.close-modal'),
+            themeToggle: document.getElementById('theme-toggle'),
+            navItems: document.querySelectorAll('.nav-item'),
+            filterChips: document.querySelectorAll('.chip'),
+            globalSearch: document.getElementById('global-search'),
+            notificationBtn: document.getElementById('notification-btn'),
+            dateDisplay: document.getElementById('current-date-display')
+        };
+    }
+
+    bindEvents() {
+        this.dom.addBtn.onclick = () => this.toggleModal(true);
+        this.dom.closeModals.forEach(btn => btn.onclick = () => this.toggleModal(false));
+        
+        this.dom.taskForm.onsubmit = (e) => this.handleTaskSubmit(e);
+        
+        this.dom.themeToggle.onclick = () => this.toggleTheme();
+        
+        this.dom.navItems.forEach(item => {
+            item.onclick = () => {
+                this.dom.navItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                this.currentView = item.dataset.view;
+                this.render();
+            };
+        });
+
+        this.dom.filterChips.forEach(chip => {
+            chip.onclick = () => {
+                this.dom.filterChips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                this.currentFilter = chip.dataset.filter;
+                this.render();
+            };
+        });
+
+        this.dom.globalSearch.oninput = (e) => {
+            this.searchQuery = e.target.value.toLowerCase();
+            this.render();
+        };
+
+        this.dom.notificationBtn.onclick = () => this.requestNotificationPermission(true);
+    }
+
+    // --- Core Logic ---
+
+    handleTaskSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.dom.taskForm);
+        
+        const newTask = {
+            id: Date.now().toString(),
+            title: document.getElementById('task-title').value,
+            date: document.getElementById('task-date').value,
+            time: document.getElementById('task-time').value,
+            priority: document.getElementById('task-priority').value,
+            category: document.getElementById('task-category').value,
+            repeat: document.getElementById('task-repeat').value,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            lastGenerated: new Date().toISOString().split('T')[0]
+        };
+
+        this.tasks.push(newTask);
+        this.save();
+        this.render();
+        this.toggleModal(false);
+        this.dom.taskForm.reset();
+        this.showToast('Task created successfully!');
+    }
+
+    toggleTask(id) {
+        this.tasks = this.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+        this.save();
+        this.render();
+    }
+
+    deleteTask(id) {
+        this.tasks = this.tasks.filter(t => t.id !== id);
+        this.save();
+        this.render();
+        this.showToast('Task deleted', 'error');
+    }
+
+    save() {
+        localStorage.setItem('smart_tasks', JSON.stringify(this.tasks));
+        this.updateProgress();
+    }
+
+    // --- UI Rendering ---
+
+    render() {
+        const filtered = this.tasks.filter(t => {
+            const matchesSearch = t.title.toLowerCase().includes(this.searchQuery);
+            const matchesFilter = this.currentFilter === 'all' || t.category === this.currentFilter;
+            
+            // Date filtering logic
+            const today = new Date().toISOString().split('T')[0];
+            let matchesView = true;
+            if (this.currentView === 'today') matchesView = t.date === today;
+            
+            return matchesSearch && matchesFilter && matchesView;
+        });
+
+        const pending = filtered.filter(t => !t.completed);
+        const completed = filtered.filter(t => t.completed);
+
+        this.dom.taskListPending.innerHTML = pending.map(t => this.createTaskHTML(t)).join('');
+        this.dom.taskListCompleted.innerHTML = completed.map(t => this.createTaskHTML(t)).join('');
+        
+        this.dom.pendingCount.textContent = pending.length;
+        this.updateProgress();
+    }
+
+    createTaskHTML(task) {
+        return `
+            <li class="task-item ${task.completed ? 'completed' : ''}" data-id="${task.id}">
+                <div class="task-checkbox" onclick="app.toggleTask('${task.id}')">
+                    ${task.completed ? '<i class="fas fa-check"></i>' : ''}
+                </div>
+                <div class="task-info">
+                    <div class="task-title">${this.escape(task.title)}</div>
+                    <div class="task-meta">
+                        <span class="prio-tag prio-${task.priority}">${task.priority}</span>
+                        <span><i class="far fa-clock"></i> ${task.time || 'No time'}</span>
+                        <span><i class="fas fa-tag"></i> ${task.category}</span>
+                        ${task.repeat !== 'none' ? '<span><i class="fas fa-redo"></i> ' + task.repeat + '</span>' : ''}
+                    </div>
+                </div>
+                <div class="task-actions">
+                    <button class="icon-btn" onclick="app.deleteTask('${task.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            </li>
+        `;
+    }
+
+    // --- Advanced Features ---
+
+    setupReminders() {
+        setInterval(() => {
+            const now = new Date();
+            const currentTime = now.toTimeString().slice(0, 5);
+            const currentDate = now.toISOString().split('T')[0];
+
+            this.tasks.forEach(t => {
+                if (!t.completed && t.date === currentDate && t.time === currentTime) {
+                    this.notifyUser(`Reminder: ${t.title}`, { body: `It's time for your task!` });
+                }
+            });
+        }, 60000); // Check every minute
+    }
+
+    checkRecurrence() {
+        const today = new Date().toISOString().split('T')[0];
+        let updated = false;
+
+        this.tasks.forEach(t => {
+            if (t.repeat !== 'none' && t.lastGenerated !== today) {
+                // Simple logic: if it's a new day and task is daily, reset or clone
+                // For this MVP, we'll just update the date to today if it's daily
+                if (t.repeat === 'daily') {
+                    t.date = today;
+                    t.completed = false;
+                    t.lastGenerated = today;
+                    updated = true;
+                }
+            }
+        });
+
+        if (updated) this.save();
+    }
+
+    updateProgress() {
+        const today = new Date().toISOString().split('T')[0];
+        const todayTasks = this.tasks.filter(t => t.date === today);
+        const completed = todayTasks.filter(t => t.completed).length;
+        const total = todayTasks.length;
+        
+        const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+        
+        if (this.dom.progressCircle) {
+            this.dom.progressCircle.setAttribute('stroke-dasharray', `${percent}, 100`);
+            this.dom.progressText.textContent = `${percent}%`;
+        }
+    }
+
+    // --- Utilities ---
+
+    toggleModal(show) {
+        this.dom.taskModal.classList.toggle('active', show);
+    }
+
+    toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        this.dom.themeToggle.querySelector('i').className = next === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+    }
+
+    updateDateDisplay() {
+        const options = { weekday: 'long', month: 'long', day: 'numeric' };
+        this.dom.dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
+    }
+
+    requestNotificationPermission(manual = false) {
+        if (!("Notification" in window)) return;
+        
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted" && manual) {
+                    this.showToast("Notifications enabled!");
+                }
+            });
+        } else if (manual) {
+            this.showToast("Notifications already enabled");
+        }
+    }
+
+    notifyUser(title, options) {
+        if (Notification.permission === "granted") {
+            new Notification(title, options);
+        }
+    }
+
+    showToast(msg, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = msg;
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    escape(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+}
 
 // Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-    renderTasks();
-    initTheme();
-    
-    // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
-    dateInput.setAttribute('min', today);
-});
-
-// --- Core Functions ---
-
-function saveTasks() {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-}
-
-function addTask(e) {
-    e.preventDefault();
-    
-    const taskText = taskInput.value.trim();
-    if (!taskText) return;
-
-    const newTask = {
-        id: Date.now().toString(),
-        text: taskText,
-        priority: priorityInput.value,
-        dueDate: dateInput.value || 'No date',
-        completed: false,
-        createdAt: new Date().toISOString()
-    };
-
-    tasks.unshift(newTask);
-    saveTasks();
-    renderTasks();
-    todoForm.reset();
-    showToast('Task added successfully!', 'success');
-}
-
-function deleteTask(id) {
-    tasks = tasks.filter(task => task.id !== id);
-    saveTasks();
-    renderTasks();
-    showToast('Task deleted', 'danger');
-}
-
-function toggleTask(id) {
-    tasks = tasks.map(task => {
-        if (task.id === id) {
-            return { ...task, completed: !task.completed };
-        }
-        return task;
-    });
-    saveTasks();
-    renderTasks();
-    const task = tasks.find(t => t.id === id);
-    showToast(task.completed ? 'Task completed!' : 'Task moved to pending', 'success');
-}
-
-function editTask(id) {
-    const task = tasks.find(t => t.id === id);
-    const newText = prompt('Edit task:', task.text);
-    
-    if (newText !== null && newText.trim() !== '') {
-        tasks = tasks.map(t => {
-            if (t.id === id) {
-                return { ...t, text: newText.trim() };
-            }
-            return t;
-        });
-        saveTasks();
-        renderTasks();
-        showToast('Task updated', 'success');
-    }
-}
-
-// --- UI Rendering ---
-
-function renderTasks() {
-    const filteredTasks = tasks.filter(task => {
-        const matchesSearch = task.text.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = 
-            currentFilter === 'all' || 
-            (currentFilter === 'pending' && !task.completed) || 
-            (currentFilter === 'completed' && task.completed);
-        return matchesSearch && matchesFilter;
-    });
-
-    const pending = filteredTasks.filter(t => !t.completed);
-    const completed = filteredTasks.filter(t => t.completed);
-
-    pendingList.innerHTML = '';
-    completedList.innerHTML = '';
-
-    pending.forEach(task => pendingList.appendChild(createTaskElement(task)));
-    completed.forEach(task => completedList.appendChild(createTaskElement(task)));
-
-    pendingCount.textContent = pending.length;
-    completedCount.textContent = completed.length;
-
-    initDragAndDrop();
-}
-
-function createTaskElement(task) {
-    const li = document.createElement('li');
-    li.className = `todo-item ${task.completed ? 'completed' : ''}`;
-    li.setAttribute('draggable', 'true');
-    li.setAttribute('data-id', task.id);
-
-    li.innerHTML = `
-        <div class="checkbox-container ${task.completed ? 'checked' : ''}" onclick="toggleTask('${task.id}')">
-            <i class="fas ${task.completed ? 'fa-check-circle' : 'fa-circle'}"></i>
-        </div>
-        <div class="task-content">
-            <span class="task-text">${escapeHtml(task.text)}</span>
-            <div class="task-meta">
-                <span class="priority-badge priority-${task.priority}">${task.priority}</span>
-                <span class="due-date"><i class="far fa-calendar-alt"></i> ${task.dueDate}</span>
-            </div>
-        </div>
-        <div class="task-actions">
-            <button class="action-btn edit-btn" onclick="editTask('${task.id}')" title="Edit">
-                <i class="fas fa-edit"></i>
-            </button>
-            <button class="action-btn delete-btn" onclick="deleteTask('${task.id}')" title="Delete">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    `;
-
-    return li;
-}
-
-// --- Features ---
-
-// Theme Toggle
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
-}
-
-themeToggle.addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    updateThemeIcon(newTheme);
-});
-
-function updateThemeIcon(theme) {
-    const icon = themeToggle.querySelector('i');
-    icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-}
-
-// Search & Filter
-searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value;
-    renderTasks();
-});
-
-filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.getAttribute('data-filter');
-        renderTasks();
-    });
-});
-
-// Drag and Drop
-function initDragAndDrop() {
-    const items = document.querySelectorAll('.todo-item');
-    let dragSrcEl = null;
-
-    items.forEach(item => {
-        item.addEventListener('dragstart', function(e) {
-            dragSrcEl = this;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        });
-
-        item.addEventListener('dragend', function() {
-            this.classList.remove('dragging');
-            items.forEach(i => i.classList.remove('over'));
-        });
-
-        item.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            return false;
-        });
-
-        item.addEventListener('dragenter', function() {
-            this.classList.add('over');
-        });
-
-        item.addEventListener('dragleave', function() {
-            this.classList.remove('over');
-        });
-
-        item.addEventListener('drop', function(e) {
-            e.stopPropagation();
-            if (dragSrcEl !== this) {
-                const fromId = dragSrcEl.getAttribute('data-id');
-                const toId = this.getAttribute('data-id');
-                reorderTasks(fromId, toId);
-            }
-            return false;
-        });
-    });
-}
-
-function reorderTasks(fromId, toId) {
-    const fromIndex = tasks.findIndex(t => t.id === fromId);
-    const toIndex = tasks.findIndex(t => t.id === toId);
-    
-    const [movedTask] = tasks.splice(fromIndex, 1);
-    tasks.splice(toIndex, 0, movedTask);
-    
-    saveTasks();
-    renderTasks();
-}
-
-// CSV Export
-exportBtn.addEventListener('click', () => {
-    if (tasks.length === 0) {
-        showToast('No tasks to export', 'danger');
-        return;
-    }
-
-    const headers = ['Task', 'Priority', 'Due Date', 'Status', 'Created At'];
-    const csvContent = [
-        headers.join(','),
-        ...tasks.map(t => [
-            `"${t.text.replace(/"/g, '""')}"`,
-            t.priority,
-            t.dueDate,
-            t.completed ? 'Completed' : 'Pending',
-            t.createdAt
-        ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `todo-export-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Exporting CSV...', 'success');
-});
-
-// Toast Notifications
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    const icon = type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
-    toast.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
-    
-    toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
-}
-
-// Helpers
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Event Listeners
-todoForm.addEventListener('submit', addTask);
+const app = new SmartTodoApp();
